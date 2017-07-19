@@ -1,0 +1,235 @@
+ Timely and Effective Care - Hospital
+
+Timely and Effective Care measures - provider data. This data set includes provider-level data for measures of heart attack care, heart failure care, pneumonia care, surgical care, emergency department care, preventive care, children’s asthma care, stroke care, blood clot prevention and treatment.
+
+Heart Failure Care
+Surgical Care
+Pneumonia Care
+Emergency Department Care
+Preventive Care
+Children's Asthma Care
+Blood Clot Prevention and Treatment
+Surgical Care
+
+
+
+
+hive > create schema hospital;
+hive >use hospital;
+
+hive >create table effectivecare(ProviderID int,HospitalName String,Address String,City String,State String,ZIPCode int,CountyName String, PhoneNumber int ,Condition String, MeasureID String, MeasureName String,Score String, Sample String,Footnote String,
+MeasureStartDate String, MeasureEndDate String,Location String) row format delimited fields terminated by ',';
+
+
+hive >load data local inpath 'Desktop/a.csv' into table effectivecare;
+
+
+1. select ProviderID,HospitalName,City,State,Condition from effectivecare where Condition == "Heart Attack or Chest Pain";
+
+2. select Condition, COUNT(*) c FROM effectivecare GROUP BY Condition HAVING c > 1;
+
+3. select ProviderID,HospitalName from  effectivecare where Footnote  is NOT NULL;
+
+4. select  MeasureName,Score,Sample from effectivecare where (MeasureName == "Head CT results" AND score == "Not Available") OR sample >5;
+5.select MeasureName,MeasureID,MeasureStartDate,MeasureEndDate from effectivecare where MeasureStartDate >= '01/01/2014' and MeasureEndDate < '09/30/2015';
+
+
+
+ 
+
+6. SELECT ProviderID,HospitalName FROM  effectivecare WHERE HospitalName REGEXP '^C';
+
+
+//find the name ending with 
+
+7.  SELECT ProviderID,HospitalName FROM  effectivecare WHERE City LIKE '%L';
+
+//To find names containing a “w”:
+
+8. SELECT ProviderID,HospitalName FROM effectivecare WHERE CountyName LIKE '%TT%';
+
+
+
+
+
+
+**************************************************************************************************
+//Introduction To Hive's Partitioning
+
+
+
+1.Load csv file to a non-partitioned table.
+2.Load non-partitioned table data to partitioned table.
+
+
+
+create schema healtheffectivecare;
+use healtheffectivecare;
+
+create table effectivecare(ProviderID int,HospitalName String,Address String,City String,State String,ZIPCode int,CountyName String, PhoneNumber int ,Condition String, MeasureID String, MeasureName String,Score String, Sample String,Footnote String,
+MeasureStartDate String, MeasureEndDate String,Location String) row format delimited fields terminated by ',';
+
+
+load data local inpath 'Desktop/a.csv' into table effectivecare;
+
+
+
+// second database
+
+create schema healtheffectivecare1;
+use healtheffectivecare1;
+
+create table effectivecare1(ProviderID int,HospitalName String,Address String,City String,State String,ZIPCode int,CountyName String, PhoneNumber int ,MeasureID String, MeasureName String,Score String, Sample String,Footnote String,MeasureStartDate String, MeasureEndDate String,Location String) 
+PARTITIONED BY (Condition String) row format delimited fields terminated by ',';
+
+describe effectivecare;
+
+SET hive.exec.dynamic.partition = true;
+SET hive.exec.dynamic.partition.mode = nonstrict;
+
+
+INSERT OVERWRITE TABLE effectivecare1 PARTITION(Condition) SELECT ProviderID, HospitalName, Address, City, State, ZIPCode, CountyName, PhoneNumber, MeasureID, MeasureName, Score, Sample, Footnote,  
+MeasureStartDate, MeasureEndDate, Location, Condition FROM healtheffectivecare.effectivecare;
+
+
+//select * from effectivecare1 where Condition == "Heart Attack or Chest Pain";
+// Now this will reduce I/O time
+
+
+
+
+*************************************************************************************************************************************
+
+
+//UDF ENCRYPTION
+
+ADD JAR /home/user/Desktop/test1.jar;
+
+ 
+
+create schema health;
+use health;
+
+
+
+
+
+
+create schema health;
+use health;
+
+create table effectivecare(ProviderID int,HospitalName String,Address String,City String,State String,ZIPCode int,CountyName String, PhoneNumber int ,Condition String, MeasureID String, MeasureName String,Score String, Sample String,Footnote String,
+MeasureStartDate String, MeasureEndDate String,Location String) row format delimited fields terminated by ',';
+
+
+
+ load data local inpath 'Desktop/a.csv' into table effectivecare;
+
+CREATE TEMPORARY FUNCTION deIdentify AS 'myudfs.Deidentify';
+
+CREATE TABLE effectivecareSample AS SELECT deIdentify(ProviderID),deIdentify(HospitalName),deIdentify(Address),deIdentify(City),deIdentify(State),deIdentify(ZIPCode),deIdentify(CountyName),deIdentify(PhoneNumber),deIdentify(Condition),deIdentify(MeasureID),deIdentify(MeasureName) ,deIdentify(Score) ,deIdentify(Sample) ,deIdentify(Footnote) ,deIdentify(MeasureStartDate) ,deIdentify(MeasureEndDate),deIdentify(Location)
+FROM effectivecare;
+
+ 
+
+**************************************************************The End*************************************************************
+
+
+
+
+
+
+
+
+PIG COMMAND:
+
+
+health = LOAD '/health.csv' USING PigStorage(',') AS (ProviderID : chararray,HospitalName : chararray, Address : chararray,      City: chararray,State: chararray,ZIPCode: int,CountyName: chararray, PhoneNumber: int ,Condition: chararray, MeasureID: chararray,  MeasureName: chararray,Score: chararray,Sample: chararray,Footnote: chararray,MeasureStartDate: chararray,
+MeasureEndDate: chararray,Location: chararray); 
+
+
+
+1. new = FILTER health BY Condition == 'Heart Attack or Chest Pain';
+   result = FOREACH new GENERATE ProviderID,HospitalName,City,State,Condition; 
+   dump result;
+
+
+5.  g = group health by Condition;
+    count = FOREACH g GENERATE group as Condition,COUNT(health) as cnt;
+    result = FOREACH count GENERATE Condition,cnt; 
+
+
+
+2.  new = FILTER health BY Footnote is NOT NULL;
+    result = FOREACH new GENERATE ProviderID,HospitalName; 
+    dump result;
+
+
+
+
+
+4.  new = FILTER health BY MeasureName == 'Head CT results' AND Score == 'Not Available';
+    result = FOREACH new GENERATE MeasureName,Score; 
+    dump result;
+
+
+
+5.   
+      new = FILTER health by MeasureStartDate >= '01/01/2014' AND MeasureEndDate < '09/30/2015';
+      result = FOREACH new GENERATE MeasureName,MeasureID,MeasureStartDate,MeasureEndDate;
+      dump result;
+      
+
+
+  
+
+
+// split operator
+   
+  6.  new = FOREACH health GENERATE State,City;
+      split new into new1 if State == 'KS', new2 if State == 'MD';
+   
+      dump new1;
+      dump new2;
+
+
+
+7. //distinct operator
+
+   d = FOREACH health GENERATE $1;
+   c = DISTINCT d;
+   dump c;
+
+  
+   //Limit data
+8.  g = FOREACH health GENERATE $8;
+    c = DISTINCT g;
+    limit_data = LIMIT c 20;
+    D = ORDER limit_data by Condition DESC;
+
+9. // order by     
+      b = DISTINCT(FOREACH health GENERATE $6);
+      c = ORDER b BY first_name DESC;
+
+
+10.  //Encryption 
+
+       REGISTER Desktop/decript.jar; 
+       
+      health = LOAD '/a.csv' USING PigStorage(',') AS (ProviderID : chararray,HospitalName : chararray,Address : chararray,City: chararray,State: chararray,ZIP Code: int,CountyName: chararray, PhoneNumber: int ,Condition: chararray, MeasureID: chararray,  MeasureName: chararray,Score: chararray,Sample: chararray,Footnote: chararray,MeasureStartDate: int,MeasureEndDate: int,Location: chararray); 
+
+
+
+      D = FOREACH health GENERATE ProviderID , DeIdentifyUDF(HospitalName,'12345678abcdefgh'), DeIdentifyUDF(Address,'12345678abcdefgh'), DeIdentifyUDF (State,'12345678abcdefgh'), DeIdentifyUDF(ZIPCode,'12345678abcdefgh'),DeIdentifyUDF(CountyName,'12345678abcdefgh'), DeIdentifyUDF(PhoneNumber,'12345678abcdefgh'),Condition,MeasureID,MeasureName,Score,Sample,
+
+Footnote,MeasureStartDate,MeasureEndDate,Location;
+
+
+  STORE D into '/deidentifiedDir';
+
+
+
+
+
+
+
